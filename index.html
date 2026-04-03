@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seven Poddoians - Student Portal</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="dark-theme">
+    <div class="bg-glow"></div>
+
+    <!-- Language Selector Overlay -->
+    <div id="language-overlay" style="position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 2rem;">
+        <div class="logo-icon" style="width: 80px; height: 80px; font-size: 2.5rem;">
+            <i class="fas fa-language"></i>
+        </div>
+        <div class="glass-panel" style="width: 90%; max-width: 400px; text-align: center; padding: 2.5rem;">
+            <h2 style="margin-bottom: 0.5rem;">Welcome / স্বাগতম</h2>
+            <p style="color: var(--text-dim); margin-bottom: 2rem;">Please select your preferred language<br>অনুগ্রহ করে আপনার পছন্দের ভাষা নির্বাচন করুন</p>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <button class="lang-choice-btn btn-primary" data-lang="en" style="justify-content: center; font-size: 1.1rem; padding: 1rem;">
+                    English
+                </button>
+                <button class="lang-choice-btn btn-primary" data-lang="bn" style="justify-content: center; font-size: 1.1rem; padding: 1rem; background: var(--secondary);">
+                    বাংলা (Bangla)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" style="display: none;">
+        <header class="glass-panel animate-in">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-users-viewfinder"></i>
+                </div>
+                <div class="logo-text">
+                    <h1 id="group-name-display">Seven Poddoians</h1>
+                    <p id="ui-subtitle">Class Directory & Information</p>
+                </div>
+            </div>
+            <div class="stats-container">
+                <div class="stat-card">
+                    <i class="fas fa-user-check"></i>
+                    <div class="stat-info">
+                        <span id="member-count">0</span>
+                        <label id="ui-stat-active">Active</label>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <nav class="glass-panel animate-in" style="animation-delay: 0.1s">
+            <button class="nav-btn active" data-tab="members">
+                <i class="fas fa-list-ul"></i> <span data-i18n="nav_members">Members</span>
+            </button>
+            <button class="nav-btn" data-tab="rules">
+                <i class="fas fa-scroll"></i> <span data-i18n="nav_rules">Rules</span>
+            </button>
+            <button class="nav-btn" data-tab="bans">
+                <i class="fas fa-user-lock"></i> <span data-i18n="nav_restrictions">Restrictions</span>
+            </button>
+            <button class="nav-btn" data-tab="feedback">
+                <i class="fas fa-paper-plane"></i> <span data-i18n="nav_feedback">Feedback</span>
+            </button>
+        </nav>
+
+        <main class="animate-in" style="animation-delay: 0.2s">
+            <!-- Members Section -->
+            <section id="members-tab" class="tab-content active">
+                <div class="action-bar">
+                    <div class="search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="search-member" placeholder="Find a classmate...">
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="members-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="th_name">Name</th>
+                                <th data-i18n="th_status">Status / Warnings</th>
+                            </tr>
+                        </thead>
+                        <tbody id="member-list-body">
+                            <!-- JS populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Rules Section -->
+            <section id="rules-tab" class="tab-content">
+                <div class="rules-card">
+                    <h2 id="rules-title">📜 Community Guidelines</h2>
+                    <ul class="rules-list" id="rules-list-container">
+                        <!-- Dynamic Rules -->
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Ban List Section -->
+            <section id="bans-tab" class="tab-content">
+                <div class="table-container">
+                    <table id="bans-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="th_name">Name</th>
+                                <th data-i18n="th_note">Note</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ban-list-body">
+                            <!-- JS populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Feedback Section -->
+            <section id="feedback-tab" class="tab-content">
+                <div class="glass-panel">
+                    <h3><i class="fas fa-comment-dots"></i> <span data-i18n="fb_title">Submit Feedback</span></h3>
+                    <p id="ui-fb-desc" style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                        Report an issue or suggest something for the group. Your feedback is sent directly to the admin.
+                    </p>
+                    <form id="user-feedback-form">
+                        <div class="form-group">
+                            <label id="ui-fb-label-name">Your Name (Optional)</label>
+                            <input type="text" id="fb-name" placeholder="Anonymous">
+                        </div>
+                        <div class="form-group">
+                            <label id="ui-fb-label-msg">Message</label>
+                            <textarea id="fb-message" rows="4" required placeholder="Type your feedback here..."></textarea>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                            <i class="fas fa-paper-plane"></i> <span data-i18n="fb_btn">Send Report</span>
+                        </button>
+                    </form>
+                    <div id="feedback-status" style="margin-top: 1rem; text-align: center; display: none;"></div>
+                </div>
+            </section>
+        </main>
+
+        <footer style="text-align: center; padding: 2rem; opacity: 0.5; font-size: 0.8rem;">
+            <p>&copy; <span id="admin-trigger" style="cursor: default;">2026</span> Seven Poddoians Management System</p>
+        </footer>
+    </div>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js",
+        "sortablejs": "https://esm.sh/sortablejs@1.15.2"
+      }
+    }
+    </script>
+    <script type="module" src="user.js"></script>
+</body>
+</html>
