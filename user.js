@@ -15,6 +15,40 @@ const feedbackForm = document.getElementById('user-feedback-form');
 const feedbackStatus = document.getElementById('feedback-status');
 const adminTrigger = document.getElementById('admin-trigger');
 
+// Warning View Elements
+const warningViewModal = document.getElementById('warning-view-modal');
+const viewWarningReason = document.getElementById('view-warning-reason');
+const viewWarningExpiry = document.getElementById('view-warning-expiry');
+const closeWarningViewBtn = document.getElementById('close-warning-view');
+
+closeWarningViewBtn.addEventListener('click', () => {
+    warningViewModal.classList.remove('open');
+});
+
+window.viewWarning = (memberId, level) => {
+    const member = allMembers.find(m => m.id === memberId);
+    if (!member || !member.warnings || !member.warnings[level]) return;
+
+    const warning = member.warnings[level];
+    viewWarningReason.textContent = warning.reason;
+    
+    if (warning.expiresAt > 0) {
+        const date = new Date(warning.expiresAt).toLocaleDateString();
+        const time = new Date(warning.expiresAt).toLocaleTimeString();
+        viewWarningExpiry.textContent = currentLang === 'bn' 
+            ? `মেয়াদ শেষ হবে: ${date} ${time}` 
+            : `Expires on: ${date} at ${time}`;
+    } else {
+        viewWarningExpiry.textContent = currentLang === 'bn' ? 'মেয়াদ শেষ হবে না' : 'Does not expire';
+    }
+
+    document.getElementById('view-warning-title').textContent = currentLang === 'bn' 
+        ? `সতর্কবার্তা ${level}` 
+        : `Warning Details (Level ${level})`;
+
+    warningViewModal.classList.add('open');
+};
+
 // Comments Elements
 const identitySelector = document.getElementById('identity-selector');
 const commentInterface = document.getElementById('comment-interface');
@@ -145,7 +179,7 @@ function applyLanguage(lang) {
     document.getElementById('fb-message').placeholder = t.fb_placeholder_msg;
     
     if (document.getElementById('rules-title')) {
-        document.getElementById('rules-title').textContent = `📜 ${t.rules_default_title}`;
+        document.getElementById('rules-title').innerHTML = `<i class="fas fa-scroll"></i> ${t.rules_default_title}`;
     }
 
     // Update Placeholders
@@ -160,13 +194,36 @@ function applyLanguage(lang) {
     renderTables(searchInput.value.toLowerCase());
 }
 
+// Loading Screen
+const loadingOverlay = document.getElementById('loading-overlay');
+const requiredLoads = 3;
+const loadedRefs = new Set();
+
+function maybeRevealApp() {
+    if (loadedRefs.size >= requiredLoads) {
+        loadingOverlay.style.display = 'none';
+        appContainer.style.display = 'block';
+    }
+}
+
+function markLoaded(key) {
+    loadedRefs.add(key);
+    maybeRevealApp();
+}
+
+setTimeout(() => {
+    loadingOverlay.style.display = 'none';
+    appContainer.style.display = 'block';
+}, 12000);
+
 langBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         const selectedLang = btn.dataset.lang;
         localStorage.setItem('preferredLang', selectedLang);
         applyLanguage(selectedLang);
         languageOverlay.style.display = 'none';
-        appContainer.style.display = 'block';
+        loadingOverlay.style.display = 'flex';
+        maybeRevealApp();
     });
 });
 
@@ -205,7 +262,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedLang) {
         applyLanguage(savedLang);
         languageOverlay.style.display = 'none';
-        appContainer.style.display = 'block';
+        loadingOverlay.style.display = 'flex';
+        maybeRevealApp();
     }
 });
 
@@ -239,16 +297,40 @@ let currentSettings = {
 navBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         const target = btn.dataset.tab;
-        navBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        tabContents.forEach(tab => {
-            tab.classList.remove('active');
-            if (tab.id === `${target}-tab`) {
-                tab.classList.add('active');
-            }
-        });
+        switchTab(target);
     });
 });
+
+function switchTab(target) {
+    navBtns.forEach(b => {
+        b.classList.remove('active');
+        if(b.dataset.tab === target) b.classList.add('active');
+    });
+    tabContents.forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.id === `${target}-tab`) {
+            tab.classList.add('active');
+        }
+    });
+}
+
+// Nav Scroll Arrows
+const mainNav = document.getElementById('main-nav');
+const navLeft = document.getElementById('nav-left');
+const navRight = document.getElementById('nav-right');
+
+function updateNavArrows() {
+    if (!mainNav || !navLeft || !navRight) return;
+    const maxScroll = mainNav.scrollWidth - mainNav.clientWidth;
+    navLeft.disabled = mainNav.scrollLeft <= 1;
+    navRight.disabled = mainNav.scrollLeft >= maxScroll - 1;
+}
+
+navLeft.addEventListener('click', () => mainNav.scrollBy({ left: -260, behavior: 'smooth' }));
+navRight.addEventListener('click', () => mainNav.scrollBy({ left: 260, behavior: 'smooth' }));
+mainNav.addEventListener('scroll', updateNavArrows);
+window.addEventListener('resize', updateNavArrows);
+updateNavArrows();
 
 // Search Logic
 searchInput.addEventListener('input', (e) => {
@@ -339,13 +421,20 @@ submitCommentBtn.addEventListener('click', () => {
     });
     newCommentText.value = '';
     if (!isAnonymous) {
-        alert(currentLang === 'bn' ? 'আপনার মন্তব্যটি পর্যালোচনার জন্য জমা দেওয়া হয়েছে।' : 'Your comment has been submitted for verification.');
+        alert(currentLang === 'bn' ? 'আপনার মন্তব্যটি অ্যাডমিন পর্যালোচনার জন্য পাঠানো হয়েছে।' : 'Sent for admin review.');
     }
 });
 
 window.postReply = (parentId) => {
     const replyText = document.getElementById(`reply-input-${parentId}`).value.trim();
-    if (!replyText || !commenterIdentity) return;
+    if (!replyText) return;
+
+    if (!commenterIdentity) {
+        alert(currentLang === 'bn' ? 'অনুগ্রহ করে প্রথমে আপনার পরিচয় নির্বাচন করুন।' : 'Please select your identity first.');
+        const selector = document.getElementById('identity-selector');
+        if (selector) selector.scrollIntoView({ behavior: 'smooth' });
+        return;
+    }
 
     const isAnonymous = commenterIdentity.id === 'anonymous';
     const commentRef = push(ref(db, 'comments'));
@@ -359,13 +448,23 @@ window.postReply = (parentId) => {
         isEdited: false,
         status: isAnonymous ? 'approved' : 'pending'
     });
+    
     document.getElementById(`reply-input-${parentId}`).value = '';
+    const box = document.getElementById(`reply-box-${parentId}`);
+    if (box) box.style.display = 'none';
+
     if (!isAnonymous) {
-        alert(currentLang === 'bn' ? 'আপনার উত্তরটি পর্যালোচনার জন্য জমা দেওয়া হয়েছে।' : 'Your reply has been submitted for verification.');
+        alert(currentLang === 'bn' ? 'আপনার উত্তরটি অ্যাডমিন পর্যালোচনার জন্য পাঠানো হয়েছে।' : 'Reply sent for admin review.');
     }
 };
 
 window.toggleReplyBox = (id) => {
+    if (!commenterIdentity) {
+        alert(currentLang === 'bn' ? 'মন্তব্য করার আগে অনুগ্রহ করে আপনার পরিচয় নির্বাচন করুন।' : 'Please select your identity before replying.');
+        const selector = document.getElementById('identity-selector');
+        if (selector) selector.scrollIntoView({ behavior: 'smooth' });
+        return;
+    }
     const box = document.getElementById(`reply-box-${id}`);
     box.style.display = box.style.display === 'none' ? 'block' : 'none';
 };
@@ -420,11 +519,11 @@ window.saveEdit = (id) => {
 function renderComments() {
     commentsList.innerHTML = '';
     
-    // Only show approved comments to the public
-    const approvedComments = allComments.filter(c => c.status === 'approved');
+    // Only show comments that have been approved by the admin
+    const visibleComments = allComments.filter(c => c.status === 'approved');
     
-    const topLevel = approvedComments.filter(c => !c.parentId).sort((a, b) => b.timestamp - a.timestamp);
-    const replies = approvedComments.filter(c => c.parentId);
+    const topLevel = visibleComments.filter(c => !c.parentId).sort((a, b) => b.timestamp - a.timestamp);
+    const replies = visibleComments.filter(c => c.parentId);
 
     if (topLevel.length === 0) {
         commentsList.innerHTML = `<div style="text-align:center; padding: 2rem; color: var(--text-dim);"><i class="fas fa-comment-slash" style="display:block; font-size: 2rem; margin-bottom: 0.5rem;"></i> No comments yet.</div>`;
@@ -492,6 +591,7 @@ onValue(ref(db, 'members'), (snapshot) => {
     }
     renderTables();
     updateIdentityUI();
+    markLoaded('members');
 });
 
 onValue(ref(db, 'comments'), (snapshot) => {
@@ -501,6 +601,7 @@ onValue(ref(db, 'comments'), (snapshot) => {
         allComments = Object.keys(data).map(key => ({ id: key, ...data[key] }));
     }
     renderComments();
+    markLoaded('comments');
 });
 
 onValue(ref(db, 'settings'), (snapshot) => {
@@ -513,6 +614,7 @@ onValue(ref(db, 'settings'), (snapshot) => {
         };
         renderView();
     }
+    markLoaded('settings');
 });
 
 function renderView() {
@@ -541,8 +643,15 @@ function renderTables(filter = '') {
         
         let strikeDisplay = '';
         if (m.strikes > 0) {
-            const level = m.strikes >= 6 ? 'severe' : '';
-            strikeDisplay = `<div class="strike-indicator active ${level}" style="display:inline-flex; width: 24px; height: 24px; font-size: 10px;">${m.strikes}</div>`;
+            const levels = Object.keys(m.warnings || {}).sort((a,b) => b-a);
+            strikeDisplay = '<div style="display: flex; gap: 4px; flex-wrap: wrap;">';
+            levels.forEach(lvl => {
+                const isSevere = parseInt(lvl) >= 6;
+                strikeDisplay += `<div class="strike-indicator active ${isSevere ? 'severe' : ''}" 
+                    onclick="viewWarning('${m.id}', ${lvl})"
+                    style="display:inline-flex; width: 24px; height: 24px; font-size: 10px; cursor: pointer;">${lvl}</div>`;
+            });
+            strikeDisplay += '</div>';
         } else {
             strikeDisplay = `<span style="color: var(--secondary); font-size: 0.8rem;"><i class="fas fa-check-circle"></i> ${translations[currentLang].standing_good}</span>`;
         }

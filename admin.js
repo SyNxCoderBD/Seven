@@ -43,6 +43,17 @@ const addMemberBtn = document.getElementById('add-member-btn');
 const memberModal = document.getElementById('member-modal');
 const memberForm = document.getElementById('member-form');
 const closeModalBtn = document.getElementById('close-modal');
+
+// Warning Modal Elements
+const warningModal = document.getElementById('warning-modal');
+const warningForm = document.getElementById('warning-form');
+const closeWarningModalBtn = document.getElementById('close-warning-modal');
+const deleteWarningBtn = document.getElementById('delete-warning-btn');
+const warningReasonInput = document.getElementById('warning-reason');
+const warningExpiryInput = document.getElementById('warning-expiry');
+const warningMemberIdInput = document.getElementById('warning-member-id');
+const warningLevelInput = document.getElementById('warning-level');
+const warningModalTitle = document.getElementById('warning-modal-title');
 const searchInput = document.getElementById('search-member');
 const navBtns = document.querySelectorAll('.nav-btn');
 const tabContents = document.querySelectorAll('.tab-content');
@@ -90,6 +101,24 @@ navBtns.forEach(btn => {
     });
 });
 
+// Nav Scroll Arrows
+const mainNav = document.getElementById('main-nav');
+const navLeft = document.getElementById('nav-left');
+const navRight = document.getElementById('nav-right');
+
+function updateNavArrows() {
+    if (!mainNav || !navLeft || !navRight) return;
+    const maxScroll = mainNav.scrollWidth - mainNav.clientWidth;
+    navLeft.disabled = mainNav.scrollLeft <= 1;
+    navRight.disabled = mainNav.scrollLeft >= maxScroll - 1;
+}
+
+navLeft.addEventListener('click', () => mainNav.scrollBy({ left: -260, behavior: 'smooth' }));
+navRight.addEventListener('click', () => mainNav.scrollBy({ left: 260, behavior: 'smooth' }));
+mainNav.addEventListener('scroll', updateNavArrows);
+window.addEventListener('resize', updateNavArrows);
+updateNavArrows();
+
 // Modal Logic
 const openModal = (id = '', name = '') => {
     document.getElementById('edit-id').value = id;
@@ -134,10 +163,73 @@ window.handleStrike = (id, level) => {
     const member = allMembers.find(m => m.id === id);
     if (!member) return;
 
-    // Toggle strike
-    const newStrike = member.strikes === level ? level - 1 : level;
-    update(ref(db, `members/${id}`), { strikes: newStrike });
+    const existingWarning = member.warnings ? member.warnings[level] : null;
+    
+    warningMemberIdInput.value = id;
+    warningLevelInput.value = level;
+    warningModalTitle.textContent = existingWarning ? `Edit Warning ${level}` : `Issue Warning ${level}`;
+    warningReasonInput.value = existingWarning ? existingWarning.reason : '';
+    warningExpiryInput.value = "0"; // Default
+    
+    deleteWarningBtn.style.display = existingWarning ? 'block' : 'none';
+    warningModal.classList.add('open');
 };
+
+warningForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = warningMemberIdInput.value;
+    const level = parseInt(warningLevelInput.value);
+    const reason = warningReasonInput.value.trim();
+    const expiryDays = parseInt(warningExpiryInput.value);
+    
+    const expiresAt = expiryDays > 0 ? (Date.now() + (expiryDays * 24 * 60 * 60 * 1000)) : 0;
+
+    const warningData = {
+        reason,
+        level,
+        expiresAt,
+        timestamp: Date.now()
+    };
+
+    const updates = {};
+    updates[`members/${id}/warnings/${level}`] = warningData;
+    
+    // Recalculate max strike level
+    const member = allMembers.find(m => m.id === id);
+    const currentWarnings = { ...(member.warnings || {}), [level]: warningData };
+    const maxLevel = Object.keys(currentWarnings).length > 0 ? Math.max(...Object.keys(currentWarnings).map(Number)) : 0;
+    updates[`members/${id}/strikes`] = maxLevel;
+
+    update(ref(db), updates);
+    closeWarningModal();
+});
+
+deleteWarningBtn.addEventListener('click', () => {
+    const id = warningMemberIdInput.value;
+    const level = warningLevelInput.value;
+    
+    if (confirm(`Remove warning ${level}?`)) {
+        const member = allMembers.find(m => m.id === id);
+        const updates = {};
+        updates[`members/${id}/warnings/${level}`] = null;
+        
+        // Recalculate strikes
+        const remainingWarnings = { ...member.warnings };
+        delete remainingWarnings[level];
+        const maxLevel = Object.keys(remainingWarnings).length > 0 ? Math.max(...Object.keys(remainingWarnings).map(Number)) : 0;
+        updates[`members/${id}/strikes`] = maxLevel;
+        
+        update(ref(db), updates);
+        closeWarningModal();
+    }
+});
+
+const closeWarningModal = () => {
+    warningModal.classList.remove('open');
+    warningForm.reset();
+};
+
+closeWarningModalBtn.addEventListener('click', closeWarningModal);
 
 // Ban Logic
 window.toggleBan = (id, currentStatus) => {
@@ -455,9 +547,34 @@ const sortable = new Sortable(memberListBody, {
 });
 
 function renderTables(filter = '') {
+    const now = Date.now();
     const filtered = [...allMembers]
         .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .filter(m => m.name.toLowerCase().includes(filter));
+        .filter(m => {
+            const matchesSearch = m.name.toLowerCase().includes(filter);
+            
+            // Check for expired warnings and update if necessary
+            if (m.warnings) {
+                let hasChanges = false;
+                const updatedWarnings = { ...m.warnings };
+                Object.keys(updatedWarnings).forEach(level => {
+                    if (updatedWarnings[level].expiresAt > 0 && updatedWarnings[level].expiresAt < now) {
+                        delete updatedWarnings[level];
+                        hasChanges = true;
+                    }
+                });
+
+                if (hasChanges) {
+                    const maxLevel = Object.keys(updatedWarnings).length > 0 ? Math.max(...Object.keys(updatedWarnings).map(Number)) : 0;
+                    update(ref(db, `members/${m.id}`), {
+                        warnings: updatedWarnings,
+                        strikes: maxLevel
+                    });
+                }
+            }
+            
+            return matchesSearch;
+        });
     
     // Member List
     memberListBody.innerHTML = '';
