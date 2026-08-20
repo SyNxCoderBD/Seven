@@ -10,6 +10,11 @@
 <body class="dark-theme">
     <div class="bg-glow"></div>
 
+    <div id="loading-overlay">
+        <div class="loading-logo"><i class="fas fa-users-viewfinder"></i></div>
+        <div class="loading-text" id="loading-text">Loading</div>
+    </div>
+
     <!-- Password Protection Overlay -->
     <div id="login-overlay" style="position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 2rem;">
         <div class="logo-icon" style="width: 64px; height: 64px; font-size: 2rem;">
@@ -51,6 +56,16 @@
                         <span id="ban-count">0</span>
                         <label>Restricted</label>
                     </div>
+                </div>
+                <div class="stat-card time-status" id="time-status-card">
+                    <i class="fas fa-clock"></i>
+                    <div class="stat-info">
+                        <span id="time-status-text">Syncing...</span>
+                        <label>World Time API</label>
+                    </div>
+                    <button class="btn-icon time-refresh" id="time-refresh-btn" title="Refresh status" style="width:auto; height:auto; padding:6px; margin-left:0.25rem;">
+                        <i class="fas fa-rotate-right"></i>
+                    </button>
                 </div>
             </div>
         </header>
@@ -159,6 +174,17 @@
             <!-- Settings Section -->
             <section id="settings-tab" class="tab-content">
                 <div class="glass-panel">
+                    <h3><i class="fas fa-clock"></i> World Time (Bangladesh)</h3>
+                    <p style="color: var(--text-dim); font-size: 0.85rem; margin: 0.5rem 0 1rem;">
+                        Synced from an online time server in Asia/Dhaka timezone.
+                    </p>
+                    <div class="dhaka-clock" id="dhaka-clock">
+                        <div class="dhaka-clock-time" id="dhaka-clock-time">--:--:--</div>
+                        <div class="dhaka-clock-date" id="dhaka-clock-date">Loading...</div>
+                    </div>
+                </div>
+
+                <div class="glass-panel">
                     <h3><i class="fas fa-pen-nib"></i> Group Identity</h3>
                     <div class="form-group" style="margin-top: 1rem;">
                         <label>WhatsApp Group Name</label>
@@ -210,27 +236,58 @@
 
         <!-- Warning Details Modal -->
         <div id="warning-modal" class="modal">
-            <div class="modal-content">
-                <h2 id="warning-modal-title">Issue Warning</h2>
+            <div class="modal-content warning-modal-content">
                 <form id="warning-form">
                     <input type="hidden" id="warning-member-id">
                     <input type="hidden" id="warning-level">
-                    <div class="form-group">
-                        <label>Reason for Warning</label>
+
+                    <!-- Header -->
+                    <div class="warning-modal-header">
+                        <div class="warning-level-badge" id="warning-level-badge">
+                            <i class="fas fa-triangle-exclamation"></i>
+                            <span id="warning-level-number">1</span>
+                        </div>
+                        <div style="flex:1; min-width: 0;">
+                            <h2 id="warning-modal-title">Issue Warning</h2>
+                            <p id="warning-member-name" class="warning-member-name">Student</p>
+                        </div>
+                    </div>
+
+                    <!-- Active / running warnings summary -->
+                    <div class="warning-running-list" id="warning-running-list"></div>
+
+                    <div class="form-group" style="margin-top: 1.25rem;">
+                        <label for="warning-reason">Reason for Warning</label>
                         <textarea id="warning-reason" required placeholder="Enter reason..." rows="3"></textarea>
                     </div>
+
                     <div class="form-group">
-                        <label>Auto-Expire In</label>
-                        <select id="warning-expiry" style="width: 100%; padding: 0.75rem; border-radius: 10px; background: transparent; color: white; border: 1px solid var(--glass-border);">
-                            <option value="0">Never</option>
-                            <option value="1">1 Day</option>
-                            <option value="3">3 Days</option>
-                            <option value="7">1 Week</option>
-                            <option value="30">1 Month</option>
-                        </select>
+                        <label>Auto-Expire After</label>
+                        <div class="expiry-presets" id="expiry-presets">
+                            <button type="button" class="expiry-chip" data-days="0">Never</button>
+                            <button type="button" class="expiry-chip" data-days="1">1 Day</button>
+                            <button type="button" class="expiry-chip" data-days="3">3 Days</button>
+                            <button type="button" class="expiry-chip" data-days="7">1 Week</button>
+                            <button type="button" class="expiry-chip" data-days="30">1 Month</button>
+                            <button type="button" class="expiry-chip custom" data-custom="1">Custom</button>
+                        </div>
+                        <div class="custom-expiry" id="custom-expiry" style="display: none;">
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="number" id="warning-expiry-value" min="1" placeholder="1" class="custom-expiry-value">
+                                <select id="warning-expiry-unit">
+                                    <option value="minutes">Minutes</option>
+                                    <option value="hours">Hours</option>
+                                    <option value="days" selected>Days</option>
+                                    <option value="weeks">Weeks</option>
+                                    <option value="months">Months</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p id="expiry-preview" class="expiry-preview"></p>
                     </div>
+
                     <div class="modal-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.5rem;">
-                        <button type="button" id="delete-warning-btn" class="btn-primary" style="background: var(--error); margin-right: auto; display: none;">Delete</button>
+                        <button type="button" id="delete-warning-btn" class="btn-primary danger-btn" style="margin-right: auto; display: none;">Delete Warning</button>
                         <button type="button" id="close-warning-modal" class="btn-icon" style="width: auto; padding: 0 1rem;">Cancel</button>
                         <button type="submit" class="btn-primary">Save Warning</button>
                     </div>

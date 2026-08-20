@@ -1,5 +1,6 @@
 import { db } from './firebase-config.js';
 import { ref, onValue, push, set, update } from "firebase/database";
+import { now } from './shared-time.js';
 
 // DOM Elements
 const memberListBody = document.getElementById('member-list-body');
@@ -17,34 +18,56 @@ const adminTrigger = document.getElementById('admin-trigger');
 
 // Warning View Elements
 const warningViewModal = document.getElementById('warning-view-modal');
-const viewWarningReason = document.getElementById('view-warning-reason');
-const viewWarningExpiry = document.getElementById('view-warning-expiry');
+const viewWarningTitle = document.getElementById('view-warning-title');
+const viewWarningMember = document.getElementById('view-warning-member');
+const viewWarningList = document.getElementById('view-warning-list');
 const closeWarningViewBtn = document.getElementById('close-warning-view');
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+
+function formatExpiry(expiresAt) {
+    if (!expiresAt || expiresAt <= 0) return currentLang === 'bn' ? 'মেয়াদ শেষ হবে না' : 'Never expires';
+    const t = new Date(expiresAt);
+    return (currentLang === 'bn' ? 'মেয়াদ শেষ হবে: ' : 'Expires: ') + t.toLocaleDateString() + ' ' + t.toLocaleTimeString();
+}
+
+// Filter to warnings that have not yet expired, using the synced clock.
+function getWarningsForDisplay(member) {
+    const warnings = member.warnings || {};
+    const t = now();
+    return Object.keys(warnings)
+        .map(lvl => ({ level: lvl, w: warnings[lvl] }))
+        .filter(x => !(x.w.expiresAt > 0 && x.w.expiresAt < t))
+        .sort((a, b) => a.level - b.level);
+}
 
 closeWarningViewBtn.addEventListener('click', () => {
     warningViewModal.classList.remove('open');
 });
 
-window.viewWarning = (memberId, level) => {
+window.viewWarning = (memberId) => {
     const member = allMembers.find(m => m.id === memberId);
-    if (!member || !member.warnings || !member.warnings[level]) return;
+    if (!member) return;
 
-    const warning = member.warnings[level];
-    viewWarningReason.textContent = warning.reason;
-    
-    if (warning.expiresAt > 0) {
-        const date = new Date(warning.expiresAt).toLocaleDateString();
-        const time = new Date(warning.expiresAt).toLocaleTimeString();
-        viewWarningExpiry.textContent = currentLang === 'bn' 
-            ? `মেয়াদ শেষ হবে: ${date} ${time}` 
-            : `Expires on: ${date} at ${time}`;
-    } else {
-        viewWarningExpiry.textContent = currentLang === 'bn' ? 'মেয়াদ শেষ হবে না' : 'Does not expire';
+    const running = getWarningsForDisplay(member);
+    viewWarningMember.textContent = member.name;
+    viewWarningTitle.textContent = currentLang === 'bn' ? 'চলমান সতর্কবার্তা' : 'Running Warnings';
+
+    if (running.length === 0) {
+        viewWarningList.innerHTML = `<div class="warning-running-empty"><i class="fas fa-check-circle"></i> ${currentLang === 'bn' ? 'কোনো সক্রিয় সতর্কবার্তা নেই' : 'No active warnings'}</div>`;
+        warningViewModal.classList.add('open');
+        return;
     }
 
-    document.getElementById('view-warning-title').textContent = currentLang === 'bn' 
-        ? `সতর্কবার্তা ${level}` 
-        : `Warning Details (Level ${level})`;
+    viewWarningList.innerHTML = running.map(({ level, w }) => `
+        <div class="warning-run-item ${parseInt(level) >= 6 ? 'severe' : ''}">
+            <span class="warning-run-num">#${level}</span>
+            <div class="warning-run-body">
+                <span class="warning-run-reason">${escapeHtml(w.reason || (currentLang === 'bn' ? 'কোনো কারণ দেওয়া হয়নি' : 'No reason provided'))}</span>
+                <span class="warning-run-exp">${formatExpiry(w.expiresAt)}</span>
+            </div>
+        </div>
+    `).join('');
 
     warningViewModal.classList.add('open');
 };
@@ -60,10 +83,8 @@ const newCommentText = document.getElementById('new-comment-text');
 const submitCommentBtn = document.getElementById('submit-comment-btn');
 const commentsList = document.getElementById('comments-list');
 
-// Language Logic
-const languageOverlay = document.getElementById('language-overlay');
-const appContainer = document.getElementById('app');
-const langBtns = document.querySelectorAll('.lang-choice-btn');
+// Language Setting (defaults to English unless a preference is saved)
+const langSwitchBtns = document.querySelectorAll('.lang-switch-btn');
 
 const translations = {
     en: {
@@ -194,40 +215,14 @@ function applyLanguage(lang) {
     renderTables(searchInput.value.toLowerCase());
 }
 
-// Loading Screen
-const loadingOverlay = document.getElementById('loading-overlay');
-const requiredLoads = 3;
-const loadedRefs = new Set();
+// Initial load checks
+document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('preferredTheme');
+    if (savedTheme) applyTheme(savedTheme);
 
-function maybeRevealApp() {
-    if (loadedRefs.size >= requiredLoads) {
-        loadingOverlay.style.display = 'none';
-        appContainer.style.display = 'block';
-    }
-}
-
-function markLoaded(key) {
-    loadedRefs.add(key);
-    maybeRevealApp();
-}
-
-setTimeout(() => {
-    loadingOverlay.style.display = 'none';
-    appContainer.style.display = 'block';
-}, 12000);
-
-langBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        const selectedLang = btn.dataset.lang;
-        localStorage.setItem('preferredLang', selectedLang);
-        applyLanguage(selectedLang);
-        languageOverlay.style.display = 'none';
-        loadingOverlay.style.display = 'flex';
-        maybeRevealApp();
-    });
+    const savedLang = localStorage.getItem('preferredLang') || 'en';
+    applyLanguage(savedLang);
 });
-
-// Theme Management
 const themeDarkBtn = document.getElementById('theme-dark-btn');
 const themeLightBtn = document.getElementById('theme-light-btn');
 
@@ -244,27 +239,12 @@ themeDarkBtn.addEventListener('click', () => applyTheme('dark'));
 themeLightBtn.addEventListener('click', () => applyTheme('light'));
 
 // Language Switching in Settings
-const langSwitchBtns = document.querySelectorAll('.lang-switch-btn');
 langSwitchBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         const selectedLang = btn.dataset.lang;
         localStorage.setItem('preferredLang', selectedLang);
         applyLanguage(selectedLang);
     });
-});
-
-// Initial load checks
-document.addEventListener('DOMContentLoaded', () => {
-    const savedTheme = localStorage.getItem('preferredTheme');
-    if (savedTheme) applyTheme(savedTheme);
-
-    const savedLang = localStorage.getItem('preferredLang');
-    if (savedLang) {
-        applyLanguage(savedLang);
-        languageOverlay.style.display = 'none';
-        loadingOverlay.style.display = 'flex';
-        maybeRevealApp();
-    }
 });
 
 // Admin Hidden Access
@@ -280,6 +260,7 @@ adminTrigger.addEventListener('click', () => {
 });
 
 // State
+let membersLoaded = false;
 let allMembers = [];
 let allComments = [];
 let userUID = localStorage.getItem('user_uid') || (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
@@ -583,16 +564,45 @@ function createCommentElement(c, childReplies = []) {
 }
 
 // Listeners
+function hideEntryLoader() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay && !overlay.classList.contains('hidden')) {
+        overlay.classList.add('hidden');
+        setTimeout(() => { overlay.style.display = 'none'; }, 500);
+    }
+}
+// Fallback: never trap the visitor even if the student list never arrives.
+setTimeout(hideEntryLoader, 15000);
+
+function renderSkeleton() {
+    memberListBody.innerHTML = '';
+    banListBody.innerHTML = '';
+    const makeRow = (cols, wideFirst) => {
+        const row = document.createElement('tr');
+        row.innerHTML = cols.map((c, i) =>
+            `<td><div class="skeleton-line ${i === 0 && wideFirst ? 'wide' : ''}"></div></td>`
+        ).join('');
+        return row;
+    };
+    for (let i = 0; i < 6; i++) memberListBody.appendChild(makeRow([true, false], true));
+    for (let i = 0; i < 3; i++) banListBody.appendChild(makeRow([true, false], true));
+}
+renderSkeleton();
+
 onValue(ref(db, 'members'), (snapshot) => {
     const data = snapshot.val();
+    membersLoaded = true;
     allMembers = [];
     if (data) {
         allMembers = Object.keys(data).map(key => ({ id: key, ...data[key] }));
     }
     renderTables();
     updateIdentityUI();
-    markLoaded('members');
+    hideEntryLoader();
 });
+
+// Re-evaluate running warnings live as the synced clock ticks (every 5 minutes).
+setInterval(() => renderTables(searchInput.value.toLowerCase()), 300000);
 
 onValue(ref(db, 'comments'), (snapshot) => {
     const data = snapshot.val();
@@ -601,7 +611,6 @@ onValue(ref(db, 'comments'), (snapshot) => {
         allComments = Object.keys(data).map(key => ({ id: key, ...data[key] }));
     }
     renderComments();
-    markLoaded('comments');
 });
 
 onValue(ref(db, 'settings'), (snapshot) => {
@@ -614,7 +623,6 @@ onValue(ref(db, 'settings'), (snapshot) => {
         };
         renderView();
     }
-    markLoaded('settings');
 });
 
 function renderView() {
@@ -629,6 +637,28 @@ function renderView() {
 }
 
 function renderTables(filter = '') {
+    // Remove any warnings that have expired (using the synced clock).
+    const nowTime = now();
+    allMembers.forEach(m => {
+        if (m.warnings) {
+            let hasChanges = false;
+            const updated = {};
+            Object.keys(m.warnings).forEach(level => {
+                if (m.warnings[level].expiresAt > 0 && m.warnings[level].expiresAt < nowTime) {
+                    hasChanges = true;
+                } else {
+                    updated[level] = m.warnings[level];
+                }
+            });
+            if (hasChanges) {
+                const maxLevel = Object.keys(updated).length > 0 ? Math.max(...Object.keys(updated).map(Number)) : 0;
+                update(ref(db, `members/${m.id}`), { warnings: updated, strikes: maxLevel });
+                m.warnings = updated;
+                m.strikes = maxLevel;
+            }
+        }
+    });
+
     const filtered = [...allMembers]
         .sort((a, b) => (a.order || 0) - (b.order || 0))
         .filter(m => m.name.toLowerCase().includes(filter));
@@ -641,17 +671,16 @@ function renderTables(filter = '') {
         row.style.animation = `fadeInUp 0.3s ease-out forwards ${index * 0.05}s`;
         row.style.opacity = '0';
         
+        const running = getWarningsForDisplay(m);
         let strikeDisplay = '';
-        if (m.strikes > 0) {
-            const levels = Object.keys(m.warnings || {}).sort((a,b) => b-a);
-            strikeDisplay = '<div style="display: flex; gap: 4px; flex-wrap: wrap;">';
-            levels.forEach(lvl => {
-                const isSevere = parseInt(lvl) >= 6;
-                strikeDisplay += `<div class="strike-indicator active ${isSevere ? 'severe' : ''}" 
-                    onclick="viewWarning('${m.id}', ${lvl})"
-                    style="display:inline-flex; width: 24px; height: 24px; font-size: 10px; cursor: pointer;">${lvl}</div>`;
-            });
-            strikeDisplay += '</div>';
+        if (running.length > 0) {
+            // Show icon + "WARNINGS" + count. Clicking opens the full reasons.
+            const severe = running.some(r => parseInt(r.level) >= 6);
+            strikeDisplay = `
+                <div class="warning-summary ${severe ? 'severe' : ''}" onclick="viewWarning('${m.id}')" title="${currentLang === 'bn' ? 'চলমান সতর্কবার্তা দেখুন' : 'View running warnings'}">
+                    <span class="warning-count-badge"><i class="fas fa-triangle-exclamation"></i> ${currentLang === 'bn' ? 'সতর্কবার্তা' : 'WARNINGS'} <span class="warning-number">${running.length}</span></span>
+                </div>
+            `;
         } else {
             strikeDisplay = `<span style="color: var(--secondary); font-size: 0.8rem;"><i class="fas fa-check-circle"></i> ${translations[currentLang].standing_good}</span>`;
         }
@@ -664,10 +693,7 @@ function renderTables(filter = '') {
                 </div>
             </td>
             <td>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    ${strikeDisplay}
-                    ${m.strikes > 0 ? `<span style="font-size: 0.75rem; color: var(--warning)">${translations[currentLang].standing_warning}</span>` : ''}
-                </div>
+                ${strikeDisplay}
             </td>
         `;
         memberListBody.appendChild(row);

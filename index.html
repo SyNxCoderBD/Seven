@@ -10,26 +10,12 @@
 <body class="dark-theme">
     <div class="bg-glow"></div>
 
-    <!-- Language Selector Overlay -->
-    <div id="language-overlay" style="position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 2rem;">
-        <div class="logo-icon" style="width: 80px; height: 80px; font-size: 2.5rem;">
-            <i class="fas fa-language"></i>
-        </div>
-        <div class="glass-panel" style="width: 90%; max-width: 400px; text-align: center; padding: 2.5rem;">
-            <h2 style="margin-bottom: 0.5rem;">Welcome / স্বাগতম</h2>
-            <p style="color: var(--text-dim); margin-bottom: 2rem;">Please select your preferred language<br>অনুগ্রহ করে আপনার পছন্দের ভাষা নির্বাচন করুন</p>
-            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                <button class="lang-choice-btn btn-primary" data-lang="en" style="justify-content: center; font-size: 1.1rem; padding: 1rem;">
-                    English
-                </button>
-                <button class="lang-choice-btn btn-primary" data-lang="bn" style="justify-content: center; font-size: 1.1rem; padding: 1rem; background: var(--secondary);">
-                    বাংলা (Bangla)
-                </button>
-            </div>
-        </div>
+    <div id="loading-overlay">
+        <div class="loading-logo"><i class="fas fa-users-viewfinder"></i></div>
+        <div class="loading-text" id="loading-text">Loading</div>
     </div>
 
-    <div id="app" style="display: none;">
+    <div id="app">
         <header class="glass-panel animate-in">
             <div class="logo">
                 <div class="logo-icon">
@@ -231,26 +217,22 @@
 
         <!-- Warning View Modal -->
         <div id="warning-view-modal" class="modal">
-            <div class="modal-content">
-                <h2 id="view-warning-title">Warning Details</h2>
-                <div id="view-warning-content" style="margin-top: 1.5rem;">
-                    <p id="view-warning-reason" style="margin-bottom: 1rem; line-height: 1.6;"></p>
-                    <p id="view-warning-expiry" style="font-size: 0.85rem; color: var(--text-dim);"></p>
+            <div class="modal-content warning-view-content">
+                <div class="warning-view-header">
+                    <div class="warning-level-badge">
+                        <i class="fas fa-triangle-exclamation"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <h2 id="view-warning-title">Running Warnings</h2>
+                        <p id="view-warning-member" style="color: var(--text-dim); font-size: 0.85rem;"></p>
+                    </div>
                 </div>
+                <div id="view-warning-list" class="warning-running-list"></div>
                 <div class="modal-actions" style="display: flex; justify-content: flex-end; margin-top: 2rem;">
                     <button type="button" id="close-warning-view" class="btn-primary">Close</button>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" style="display: none; position: fixed; inset: 0; z-index: 10001; align-items: center; justify-content: center; flex-direction: column; gap: 1.5rem; background: radial-gradient(circle at 20% 15%, rgba(129, 140, 248, 0.25), transparent 45%), var(--bg);">
-        <div class="logo-icon" style="width: 76px; height: 76px; font-size: 2.25rem; animation: pulse 2s ease-in-out infinite;">
-            <i class="fas fa-users-viewfinder"></i>
-        </div>
-        <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
-        <p style="color: var(--text-dim); text-align: center;">Loading your portal...<br>লোড হচ্ছে...</p>
     </div>
 
     <script type="importmap">

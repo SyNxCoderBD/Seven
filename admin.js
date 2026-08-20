@@ -1,7 +1,7 @@
 import { db } from './firebase-config.js';
 import { ref, set, push, onValue, remove, update } from "firebase/database";
 import Sortable from "sortablejs";
-
+import { now, getTimeStatus, loadTimeStatus, getDhakaTime, getDhakaDate } from './shared-time.js';
 // Security Logic
 const loginOverlay = document.getElementById('login-overlay');
 const appContainer = document.getElementById('app');
@@ -50,10 +50,18 @@ const warningForm = document.getElementById('warning-form');
 const closeWarningModalBtn = document.getElementById('close-warning-modal');
 const deleteWarningBtn = document.getElementById('delete-warning-btn');
 const warningReasonInput = document.getElementById('warning-reason');
-const warningExpiryInput = document.getElementById('warning-expiry');
 const warningMemberIdInput = document.getElementById('warning-member-id');
 const warningLevelInput = document.getElementById('warning-level');
 const warningModalTitle = document.getElementById('warning-modal-title');
+const warningLevelNumber = document.getElementById('warning-level-number');
+const warningLevelBadge = document.getElementById('warning-level-badge');
+const warningMemberName = document.getElementById('warning-member-name');
+const warningRunningList = document.getElementById('warning-running-list');
+const expiryPresets = document.getElementById('expiry-presets');
+const customExpiry = document.getElementById('custom-expiry');
+const warningExpiryValue = document.getElementById('warning-expiry-value');
+const warningExpiryUnit = document.getElementById('warning-expiry-unit');
+const expiryPreview = document.getElementById('expiry-preview');
 const searchInput = document.getElementById('search-member');
 const navBtns = document.querySelectorAll('.nav-btn');
 const tabContents = document.querySelectorAll('.tab-content');
@@ -75,7 +83,59 @@ const adminCommentsList = document.getElementById('admin-comments-list');
 const feedbackListContainer = document.getElementById('feedback-list');
 const testFeedbackBtn = document.getElementById('test-feedback-btn');
 
+// World Time API Status
+const timeStatusCard = document.getElementById('time-status-card');
+const timeStatusText = document.getElementById('time-status-text');
+const timeRefreshBtn = document.getElementById('time-refresh-btn');
+
+function renderTimeStatus() {
+    if (!timeStatusCard) return;
+    const s = getTimeStatus();
+    if (s.synced) {
+        timeStatusCard.classList.add('ok');
+        timeStatusCard.classList.remove('error');
+        timeStatusText.textContent = 'Online · ' + getDhakaTime();
+    } else if (s.lastError) {
+        timeStatusCard.classList.add('error');
+        timeStatusCard.classList.remove('ok');
+        timeStatusText.textContent = 'Error';
+    } else {
+        timeStatusCard.classList.remove('ok', 'error');
+        timeStatusText.textContent = 'Syncing...';
+    }
+}
+
+// Listen for the shared clock's sync/error events and reflect them live.
+window.addEventListener('timesync', renderTimeStatus);
+window.addEventListener('timeerror', renderTimeStatus);
+
+timeRefreshBtn.addEventListener('click', async () => {
+    timeStatusText.textContent = 'Refreshing...';
+    timeStatusCard.classList.remove('ok', 'error');
+    const btnIcon = timeRefreshBtn.querySelector('i');
+    if (btnIcon) btnIcon.classList.add('fa-spin');
+    const s = await loadTimeStatus();
+renderTimeStatus();
+
+// Live Bangladesh (Dhaka) clock shown in the Settings tab. Driven entirely by
+// the synced server time — never the device clock.
+const dhakaClockTime = document.getElementById('dhaka-clock-time');
+const dhakaClockDate = document.getElementById('dhaka-clock-date');
+
+function tickDhakaClock() {
+    if (!dhakaClockTime) return;
+    dhakaClockTime.textContent = getDhakaTime();
+    if (dhakaClockDate) dhakaClockDate.textContent = getDhakaDate();
+}
+tickDhakaClock();
+setInterval(tickDhakaClock, 1000);
+    if (btnIcon) btnIcon.classList.remove('fa-spin');
+});
+
+renderTimeStatus();
+
 // State
+let membersLoaded = false;
 let allMembers = [];
 let allFeedback = [];
 let currentSettings = {
@@ -158,43 +218,151 @@ memberForm.addEventListener('submit', (e) => {
     closeModal();
 });
 
+// Warning helpers
+const UNIT_MS = { minutes: 60000, hours: 3600000, days: 86400000, weeks: 604800000, months: 2592000000 };
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+
+function formatExpiry(expiresAt) {
+    if (!expiresAt || expiresAt <= 0) return 'Never expires';
+    const t = new Date(expiresAt);
+    return `Expires ${t.toLocaleDateString()} at ${t.toLocaleTimeString()}`;
+}
+
+function getSelectedExpiryMs() {
+    const active = expiryPresets.querySelector('.expiry-chip.active');
+    if (!active) return 0;
+    if (active.dataset.custom) {
+        const val = parseInt(warningExpiryValue.value, 10);
+        if (!val || val <= 0) return 0;
+        return val * (UNIT_MS[warningExpiryUnit.value] || 0);
+    }
+    return parseInt(active.dataset.days, 10) * UNIT_MS.days;
+}
+
+function selectExpiryChip(daysOrNum, remainingMs = 0) {
+    expiryPresets.querySelectorAll('.expiry-chip').forEach(c => c.classList.remove('active'));
+    const preset = [1, 3, 7, 30].find(d => Math.abs(daysOrNum - d) < 0.01);
+    if (preset !== undefined) {
+        expiryPresets.querySelector(`.expiry-chip[data-days="${preset}"]`).classList.add('active');
+        customExpiry.style.display = 'none';
+    } else {
+        const custom = expiryPresets.querySelector('.expiry-chip.custom');
+        custom.classList.add('active');
+        customExpiry.style.display = 'flex';
+        if (remainingMs > 0) {
+            let value = 1, unit = 'days';
+            for (const [u, m] of [['minutes', UNIT_MS.minutes], ['hours', UNIT_MS.hours], ['days', UNIT_MS.days], ['weeks', UNIT_MS.weeks], ['months', UNIT_MS.months]]) {
+                const v = remainingMs / m;
+                if (Number.isInteger(Math.round(v)) && Math.abs(v) >= 1) { value = Math.round(v); unit = u; }
+            }
+            warningExpiryValue.value = value;
+            warningExpiryUnit.value = unit;
+        }
+    }
+    updateExpiryPreview();
+}
+
+function populateExpiryForEditing(expiresAt) {
+    if (!expiresAt || expiresAt <= 0) {
+        selectExpiryChip(0);
+        return;
+    }
+    const remainingMs = expiresAt - now();
+    selectExpiryChip(remainingMs / UNIT_MS.days, remainingMs);
+}
+
+function updateExpiryPreview() {
+    const durMs = getSelectedExpiryMs();
+    if (!durMs) {
+        expiryPreview.textContent = 'This warning will never expire.';
+        expiryPreview.style.color = 'var(--text-dim)';
+        return;
+    }
+    const exp = new Date(now() + durMs);
+    expiryPreview.textContent = 'Expires on ' + exp.toLocaleDateString() + ' at ' + exp.toLocaleTimeString();
+    expiryPreview.style.color = 'var(--secondary)';
+}
+
+function renderWarningRunning(member) {
+    warningRunningList.innerHTML = '';
+    if (!member) return;
+    const warnings = member.warnings || {};
+    const active = Object.keys(warnings)
+        .map(lvl => ({ lvl, w: warnings[lvl] }))
+        .filter(x => !(x.w.expiresAt > 0 && x.w.expiresAt < now()));
+
+    if (active.length === 0) {
+        warningRunningList.innerHTML = '<div class="warning-running-empty"><i class="fas fa-check-circle"></i> No active warnings</div>';
+        return;
+    }
+
+    warningRunningList.innerHTML = active.map(({ lvl, w }) => `
+        <div class="warning-run-item ${parseInt(lvl) >= 6 ? 'severe' : ''}">
+            <button type="button" class="warning-run-num" onclick="handleStrike('${m.id}', ${lvl})" title="Edit warning #${lvl}">#${lvl}</button>
+            <div class="warning-run-body">
+                <span class="warning-run-reason">${escapeHtml(w.reason || 'No reason provided')}</span>
+                <span class="warning-run-exp">${formatExpiry(w.expiresAt)}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
 // Strike Logic
 window.handleStrike = (id, level) => {
     const member = allMembers.find(m => m.id === id);
     if (!member) return;
 
     const existingWarning = member.warnings ? member.warnings[level] : null;
-    
     warningMemberIdInput.value = id;
     warningLevelInput.value = level;
-    warningModalTitle.textContent = existingWarning ? `Edit Warning ${level}` : `Issue Warning ${level}`;
+    warningLevelNumber.textContent = level;
+    warningLevelBadge.classList.toggle('severe', parseInt(level) >= 6);
+    warningModalTitle.textContent = existingWarning ? `Edit Warning #${level}` : `Issue Warning #${level}`;
+    warningMemberName.textContent = member.name;
     warningReasonInput.value = existingWarning ? existingWarning.reason : '';
-    warningExpiryInput.value = "0"; // Default
-    
+
+    populateExpiryForEditing(existingWarning ? existingWarning.expiresAt : 0);
+
     deleteWarningBtn.style.display = existingWarning ? 'block' : 'none';
+    renderWarningRunning(member);
     warningModal.classList.add('open');
 };
+
+// Expiry chip interactions
+expiryPresets.addEventListener('click', (e) => {
+    const chip = e.target.closest('.expiry-chip');
+    if (!chip) return;
+    expiryPresets.querySelectorAll('.expiry-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    customExpiry.style.display = chip.dataset.custom ? 'flex' : 'none';
+    updateExpiryPreview();
+});
+
+warningExpiryValue.addEventListener('input', updateExpiryPreview);
+warningExpiryUnit.addEventListener('change', updateExpiryPreview);
 
 warningForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const id = warningMemberIdInput.value;
     const level = parseInt(warningLevelInput.value);
     const reason = warningReasonInput.value.trim();
-    const expiryDays = parseInt(warningExpiryInput.value);
-    
-    const expiresAt = expiryDays > 0 ? (Date.now() + (expiryDays * 24 * 60 * 60 * 1000)) : 0;
+    if (!reason) return;
+
+    const durMs = getSelectedExpiryMs();
+    const timestamp = now();
+    const expiresAt = durMs > 0 ? (timestamp + durMs) : 0;
 
     const warningData = {
         reason,
         level,
         expiresAt,
-        timestamp: Date.now()
+        timestamp
     };
 
     const updates = {};
     updates[`members/${id}/warnings/${level}`] = warningData;
-    
-    // Recalculate max strike level
+
     const member = allMembers.find(m => m.id === id);
     const currentWarnings = { ...(member.warnings || {}), [level]: warningData };
     const maxLevel = Object.keys(currentWarnings).length > 0 ? Math.max(...Object.keys(currentWarnings).map(Number)) : 0;
@@ -207,18 +375,17 @@ warningForm.addEventListener('submit', (e) => {
 deleteWarningBtn.addEventListener('click', () => {
     const id = warningMemberIdInput.value;
     const level = warningLevelInput.value;
-    
+
     if (confirm(`Remove warning ${level}?`)) {
         const member = allMembers.find(m => m.id === id);
         const updates = {};
         updates[`members/${id}/warnings/${level}`] = null;
-        
-        // Recalculate strikes
-        const remainingWarnings = { ...member.warnings };
+
+        const remainingWarnings = { ...(member.warnings || {}) };
         delete remainingWarnings[level];
         const maxLevel = Object.keys(remainingWarnings).length > 0 ? Math.max(...Object.keys(remainingWarnings).map(Number)) : 0;
         updates[`members/${id}/strikes`] = maxLevel;
-        
+
         update(ref(db), updates);
         closeWarningModal();
     }
@@ -227,6 +394,8 @@ deleteWarningBtn.addEventListener('click', () => {
 const closeWarningModal = () => {
     warningModal.classList.remove('open');
     warningForm.reset();
+    warningExpiryValue.value = '';
+    warningExpiryUnit.value = 'days';
 };
 
 closeWarningModalBtn.addEventListener('click', closeWarningModal);
@@ -304,9 +473,37 @@ searchInput.addEventListener('input', (e) => {
     renderTables(e.target.value.toLowerCase());
 });
 
-// Sync with Firebase (Members)
+function hideEntryLoader() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay && !overlay.classList.contains('hidden')) {
+        overlay.classList.add('hidden');
+        setTimeout(() => { overlay.style.display = 'none'; }, 500);
+    }
+}
+function renderSkeleton() {
+    memberListBody.innerHTML = '';
+    banListBody.innerHTML = '';
+    const makeRow = () => {
+        const row = document.createElement('tr');
+        [true, false, false].forEach((w, i) => {
+            const td = document.createElement('td');
+            const line = document.createElement('div');
+            line.className = `skeleton-line ${i === 0 ? 'wide' : ''}`;
+            td.appendChild(line);
+            row.appendChild(td);
+        });
+        return row;
+    };
+    for (let i = 0; i < 6; i++) memberListBody.appendChild(makeRow());
+    for (let i = 0; i < 3; i++) banListBody.appendChild(makeRow());
+}
+renderSkeleton();
+// Fallback: never trap the admin even if the student list never arrives.
+setTimeout(hideEntryLoader, 15000);
+
 onValue(ref(db, 'members'), (snapshot) => {
     const data = snapshot.val();
+    membersLoaded = true;
     allMembers = [];
     if (data) {
         allMembers = Object.keys(data).map(key => ({
@@ -315,7 +512,11 @@ onValue(ref(db, 'members'), (snapshot) => {
         }));
     }
     renderTables();
+    hideEntryLoader();
 });
+
+// Re-run expiration checks (every 5 minutes) as the synced clock ticks.
+setInterval(() => renderTables(searchInput.value.toLowerCase()), 300000);
 
 // Sync with Firebase (Comments)
 onValue(ref(db, 'comments'), (snapshot) => {
@@ -444,18 +645,20 @@ window.deleteRule = (id) => {
 };
 
 // Feedback Actions
-testFeedbackBtn.addEventListener('click', () => {
-    const name = prompt("Enter sender name (Simulation):", "Anonymous Student");
-    const msg = prompt("Enter feedback message:");
-    if (msg) {
-        const feedbackRef = push(ref(db, 'feedback'));
-        set(feedbackRef, {
-            user: name || "Anonymous",
-            message: msg,
-            timestamp: Date.now()
-        });
-    }
-});
+if (testFeedbackBtn) {
+    testFeedbackBtn.addEventListener('click', () => {
+        const name = prompt("Enter sender name (Simulation):", "Anonymous Student");
+        const msg = prompt("Enter feedback message:");
+        if (msg) {
+            const feedbackRef = push(ref(db, 'feedback'));
+            set(feedbackRef, {
+                user: name || "Anonymous",
+                message: msg,
+                timestamp: Date.now()
+            });
+        }
+    });
+}
 
 window.deleteFeedback = (id) => {
     if (confirm("Delete this feedback report?")) {
@@ -547,7 +750,7 @@ const sortable = new Sortable(memberListBody, {
 });
 
 function renderTables(filter = '') {
-    const now = Date.now();
+    const nowTime = now();
     const filtered = [...allMembers]
         .sort((a, b) => (a.order || 0) - (b.order || 0))
         .filter(m => {
@@ -558,7 +761,7 @@ function renderTables(filter = '') {
                 let hasChanges = false;
                 const updatedWarnings = { ...m.warnings };
                 Object.keys(updatedWarnings).forEach(level => {
-                    if (updatedWarnings[level].expiresAt > 0 && updatedWarnings[level].expiresAt < now) {
+                    if (updatedWarnings[level].expiresAt > 0 && updatedWarnings[level].expiresAt < nowTime) {
                         delete updatedWarnings[level];
                         hasChanges = true;
                     }
