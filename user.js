@@ -94,6 +94,7 @@ const translations = {
         nav_rules: "Rules",
         nav_restrictions: "Restrictions",
         nav_feedback: "Feedback",
+        nav_reports: "Reports",
         nav_settings: "Settings",
         search_placeholder: "Find a classmate...",
         th_name: "Name",
@@ -103,11 +104,21 @@ const translations = {
         fb_desc: "Report an issue or suggest something for the group. Your feedback is sent directly to the admin.",
         fb_label_name: "Your Name (Optional)",
         fb_label_msg: "Message",
+        fb_label_img: "Attach Image (Optional)",
         fb_placeholder_name: "Anonymous",
         fb_placeholder_msg: "Type your feedback here...",
         fb_btn: "Send Report",
         fb_success: "Feedback submitted successfully!",
         fb_error: "Failed to submit. Try again later.",
+        rep_title: "Submit a Report",
+        rep_desc: "Report a problem with a classmate. Your report is sent directly to the admin.",
+        rep_label_name: "Your Name",
+        rep_label_member: "Reported Member",
+        rep_label_msg: "Problem / Message",
+        rep_label_img: "Attach Image (Optional)",
+        rep_btn: "Send Report",
+        rep_success: "Report submitted successfully!",
+        rep_error: "Failed to submit. Try again later.",
         st_appearance: "Appearance",
         st_appearance_desc: "Customize how the portal looks on your device.",
         st_language: "Language",
@@ -141,6 +152,7 @@ const translations = {
         nav_rules: "নিয়মাবলী",
         nav_restrictions: "নিষেধাজ্ঞা",
         nav_feedback: "মতামত",
+        nav_reports: "রিপোর্ট",
         nav_settings: "সেটিংস",
         search_placeholder: "সহপাঠী খুঁজুন...",
         th_name: "নাম",
@@ -150,11 +162,21 @@ const translations = {
         fb_desc: "গ্রুপের জন্য কোনো সমস্যা রিপোর্ট করুন বা পরামর্শ দিন। আপনার মতামত সরাসরি অ্যাডমিনের কাছে পাঠানো হবে।",
         fb_label_name: "আপনার নাম (ঐচ্ছিক)",
         fb_label_msg: "বার্তা",
+        fb_label_img: "ছবি সংযুক্ত করুন (ঐচ্ছিক)",
         fb_placeholder_name: "অজ্ঞাতনামা",
         fb_placeholder_msg: "আপনার মতামত এখানে লিখুন...",
         fb_btn: "রিপোর্ট পাঠান",
         fb_success: "মতামত সফলভাবে জমা দেওয়া হয়েছে!",
         fb_error: "জমা দিতে ব্যর্থ হয়েছে। পরে আবার চেষ্টা করুন।",
+        rep_title: "রিপোর্ট জমা দিন",
+        rep_desc: "সহপাঠীর কোনো সমস্যা রিপোর্ট করুন। আপনার রিপোর্ট সরাসরি অ্যাডমিনের কাছে পাঠানো হবে।",
+        rep_label_name: "আপনার নাম",
+        rep_label_member: "রিপোর্টকৃত সদস্য",
+        rep_label_msg: "সমস্যা / বার্তা",
+        rep_label_img: "ছবি সংযুক্ত করুন (ঐচ্ছিক)",
+        rep_btn: "রিপোর্ট পাঠান",
+        rep_success: "রিপোর্ট সফলভাবে জমা দেওয়া হয়েছে!",
+        rep_error: "জমা দিতে ব্যর্থ হয়েছে। পরে আবার চেষ্টা করুন।",
         st_appearance: "চেহারা",
         st_appearance_desc: "আপনার ডিভাইসে পোর্টালটি কেমন দেখাবে তা কাস্টমাইজ করুন।",
         st_language: "ভাষা",
@@ -196,8 +218,16 @@ function applyLanguage(lang) {
     document.getElementById('ui-fb-desc').textContent = t.fb_desc;
     document.getElementById('ui-fb-label-name').textContent = t.fb_label_name;
     document.getElementById('ui-fb-label-msg').textContent = t.fb_label_msg;
+    document.getElementById('ui-fb-label-img').textContent = t.fb_label_img;
     document.getElementById('fb-name').placeholder = t.fb_placeholder_name;
     document.getElementById('fb-message').placeholder = t.fb_placeholder_msg;
+    document.getElementById('rep-title').textContent = t.rep_title;
+    document.getElementById('rep-desc').textContent = t.rep_desc;
+    document.getElementById('rep-label-name').textContent = t.rep_label_name;
+    document.getElementById('rep-label-member').textContent = t.rep_label_member;
+    document.getElementById('rep-label-msg').textContent = t.rep_label_msg;
+    document.getElementById('rep-label-img').textContent = t.rep_label_img;
+    document.getElementById('rep-submit-btn').textContent = t.rep_btn;
     
     if (document.getElementById('rules-title')) {
         document.getElementById('rules-title').innerHTML = `<i class="fas fa-scroll"></i> ${t.rules_default_title}`;
@@ -218,25 +248,37 @@ function applyLanguage(lang) {
 // Initial load checks
 document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('preferredTheme');
-    if (savedTheme) applyTheme(savedTheme);
+    applyTheme(savedTheme || 'dark');
 
     const savedLang = localStorage.getItem('preferredLang') || 'en';
     applyLanguage(savedLang);
 });
-const themeDarkBtn = document.getElementById('theme-dark-btn');
-const themeLightBtn = document.getElementById('theme-light-btn');
+const themeCards = document.querySelectorAll('.theme-card');
 
 function applyTheme(theme) {
-    if (theme === 'light') {
-        document.body.classList.add('light-theme');
-    } else {
-        document.body.classList.remove('light-theme');
-    }
+    if (!theme) theme = 'dark';
+    document.body.setAttribute('data-theme', theme);
+    document.body.classList.toggle('theme-switching', true);
+    setTimeout(() => document.body.classList.remove('theme-switching'), 600);
+    themeCards.forEach(card => {
+        card.classList.toggle('active', card.dataset.theme === theme);
+    });
     localStorage.setItem('preferredTheme', theme);
 }
 
-themeDarkBtn.addEventListener('click', () => applyTheme('dark'));
-themeLightBtn.addEventListener('click', () => applyTheme('light'));
+themeCards.forEach(card => {
+    card.addEventListener('click', () => applyTheme(card.dataset.theme));
+});
+
+// Collapsible settings panels
+document.querySelectorAll('.collapse-toggle').forEach(toggle => {
+    toggle.addEventListener('click', () => {
+        const key = toggle.dataset.collapse;
+        const body = document.querySelector(`.collapse-body[data-collapse-body="${key}"]`);
+        const isOpen = toggle.classList.toggle('open');
+        body.classList.toggle('collapsed', !isOpen);
+    });
+});
 
 // Language Switching in Settings
 langSwitchBtns.forEach(btn => {
@@ -319,6 +361,20 @@ searchInput.addEventListener('input', (e) => {
 });
 
 // Feedback Submission
+const fbImageInput = document.getElementById('fb-image');
+const fbImagePreview = document.getElementById('fb-image-preview');
+let fbImageBase64 = null;
+
+fbImageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    setFileUploadState(fbImageInput, file ? file.name : null);
+    if (!file) { fbImageBase64 = null; fbImagePreview.innerHTML = ''; return; }
+    fileToBase64(file, result => {
+        fbImageBase64 = result;
+        fbImagePreview.innerHTML = `<img src="${result}" alt="Feedback image">`;
+    });
+});
+
 feedbackForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const name = document.getElementById('fb-name').value.trim() || 'Anonymous';
@@ -329,12 +385,16 @@ feedbackForm.addEventListener('submit', (e) => {
         set(feedbackRef, {
             user: name,
             message: message,
+            imageBase64: fbImageBase64 || null,
             timestamp: Date.now()
         }).then(() => {
             feedbackStatus.textContent = translations[currentLang].fb_success;
             feedbackStatus.style.color = 'var(--secondary)';
             feedbackStatus.style.display = 'block';
             feedbackForm.reset();
+            setFileUploadState(fbImageInput, null);
+            fbImageBase64 = null;
+            fbImagePreview.innerHTML = '';
             setTimeout(() => { feedbackStatus.style.display = 'none'; }, 3000);
         }).catch(() => {
             feedbackStatus.textContent = translations[currentLang].fb_error;
@@ -343,6 +403,97 @@ feedbackForm.addEventListener('submit', (e) => {
         });
     }
 });
+
+// Report Section
+const reportForm = document.getElementById('user-report-form');
+const reportStatus = document.getElementById('report-status');
+const reportMemberSelect = document.getElementById('report-member');
+const reportImageInput = document.getElementById('report-image');
+const reportImagePreview = document.getElementById('report-image-preview');
+let reportImageBase64 = null;
+
+function populateReportMembers() {
+    reportMemberSelect.innerHTML = `<option value="" disabled selected>${currentLang === 'bn' ? 'একজন সদস্য নির্বাচন করুন...' : 'Select a member...'}</option>`;
+    allMembers.filter(m => !m.isBanned).forEach(m => {
+        const option = document.createElement('option');
+        option.value = m.id;
+        option.textContent = m.name;
+        reportMemberSelect.appendChild(option);
+    });
+}
+
+reportImageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    setFileUploadState(reportImageInput, file ? file.name : null);
+    if (!file) { reportImageBase64 = null; reportImagePreview.innerHTML = ''; return; }
+    fileToBase64(file, result => {
+        reportImageBase64 = result;
+        reportImagePreview.innerHTML = `<img src="${result}" alt="Report image">`;
+    });
+});
+
+reportForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('report-name').value.trim();
+    const memberId = reportMemberSelect.value;
+    const message = document.getElementById('report-message').value.trim();
+    const member = allMembers.find(m => m.id === memberId);
+
+    if (name && memberId && message) {
+        const reportRef = push(ref(db, 'reports'));
+        set(reportRef, {
+            reporterName: name,
+            reportedMemberId: memberId,
+            reportedMemberName: member ? member.name : '',
+            message: message,
+            imageBase64: reportImageBase64 || null,
+            timestamp: Date.now()
+        }).then(() => {
+            reportStatus.textContent = translations[currentLang].rep_success;
+            reportStatus.style.color = 'var(--secondary)';
+            reportStatus.style.display = 'block';
+            reportForm.reset();
+            setFileUploadState(reportImageInput, null);
+            reportImageBase64 = null;
+            reportImagePreview.innerHTML = '';
+            setTimeout(() => { reportStatus.style.display = 'none'; }, 3000);
+        }).catch(() => {
+            reportStatus.textContent = translations[currentLang].rep_error;
+            reportStatus.style.color = 'var(--error)';
+            reportStatus.style.display = 'block';
+        });
+    }
+});
+
+// Image to base64 converter (auto-resized to keep the DB small)
+function fileToBase64(file, cb) {
+    const reader = new FileReader();
+    reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+            let w = img.width, h = img.height;
+            const maxDim = 1000;
+            const scale = Math.min(1, maxDim / Math.max(w, h));
+            if (scale < 1) { w = Math.round(w * scale); h = Math.round(h * scale); }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            cb(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+// Update the custom file-upload button state
+function setFileUploadState(input, fileName) {
+    const wrap = input.closest('.file-upload');
+    if (!wrap) return;
+    const textEl = wrap.querySelector('.file-upload-text');
+    wrap.classList.toggle('has-file', !!fileName);
+    if (textEl) textEl.textContent = fileName || 'Choose Image';
+}
 
 // Comment Identity Management
 function updateIdentityUI() {
@@ -598,6 +749,7 @@ onValue(ref(db, 'members'), (snapshot) => {
     }
     renderTables();
     updateIdentityUI();
+    populateReportMembers();
     hideEntryLoader();
 });
 
@@ -719,3 +871,10 @@ function renderTables(filter = '') {
 
     memberCountEl.textContent = activeMembers.length;
 }
+window.viewImage = (src) => {
+    const lightbox = document.createElement('div');
+    lightbox.className = 'image-lightbox';
+    lightbox.innerHTML = `<img src="${src}" alt="Attachment">`;
+    lightbox.addEventListener('click', () => lightbox.remove());
+    document.body.appendChild(lightbox);
+};

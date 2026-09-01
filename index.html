@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="dark-theme">
+<body class="theme-dark">
     <div class="bg-glow"></div>
 
     <div id="loading-overlay">
@@ -54,6 +54,9 @@
                 </button>
                 <button class="nav-btn" data-tab="feedback">
                     <i class="fas fa-paper-plane"></i> <span data-i18n="nav_feedback">Feedback</span>
+                </button>
+                <button class="nav-btn" data-tab="reports">
+                    <i class="fas fa-flag"></i> <span data-i18n="nav_reports">Reports</span>
                 </button>
                 <button class="nav-btn" data-tab="settings">
                     <i class="fas fa-cog"></i> <span data-i18n="nav_settings">Settings</span>
@@ -171,6 +174,18 @@
                             <label id="ui-fb-label-msg">Message</label>
                             <textarea id="fb-message" rows="4" required placeholder="Type your feedback here..."></textarea>
                         </div>
+                        <div class="form-group">
+                            <label id="ui-fb-label-img">Attach Image (Optional)</label>
+                            <span class="file-upload">
+                                <input type="file" id="fb-image" accept="image/*">
+                                <span class="file-upload-btn">
+                                    <i class="fas fa-image"></i>
+                                    <span class="file-upload-text">Choose Image</span>
+                                    <i class="fas fa-check file-upload-done"></i>
+                                </span>
+                            </span>
+                            <div id="fb-image-preview" class="report-image-preview"></div>
+                        </div>
                         <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
                             <i class="fas fa-paper-plane"></i> <span data-i18n="fb_btn">Send Report</span>
                         </button>
@@ -179,19 +194,123 @@
                 </div>
             </section>
 
+            <!-- Reports Section -->
+            <section id="reports-tab" class="tab-content">
+                <div class="glass-panel">
+                    <h3><i class="fas fa-flag"></i> <span id="rep-title">Submit a Report</span></h3>
+                    <p id="rep-desc" style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                        Report a problem with a classmate. Your report is sent directly to the admin.
+                    </p>
+                    <form id="user-report-form">
+                        <div class="form-group">
+                            <label id="rep-label-name">Your Name</label>
+                            <input type="text" id="report-name" placeholder="Enter your name..." required>
+                        </div>
+                        <div class="form-group">
+                            <label id="rep-label-member">Reported Member</label>
+                            <select id="report-member" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label id="rep-label-msg">Problem / Message</label>
+                            <textarea id="report-message" rows="4" required placeholder="Describe the problem..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label id="rep-label-img">Attach Image (Optional)</label>
+                            <span class="file-upload">
+                                <input type="file" id="report-image" accept="image/*">
+                                <span class="file-upload-btn">
+                                    <i class="fas fa-image"></i>
+                                    <span class="file-upload-text">Choose Image</span>
+                                    <i class="fas fa-check file-upload-done"></i>
+                                </span>
+                            </span>
+                            <div id="report-image-preview" class="report-image-preview"></div>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                            <i class="fas fa-paper-plane"></i> <span id="rep-submit-btn">Send Report</span>
+                        </button>
+                    </form>
+                    <div id="report-status" style="margin-top: 1rem; text-align: center; display: none;"></div>
+                </div>
+            </section>
+
             <!-- Settings Section -->
             <section id="settings-tab" class="tab-content">
                 <div class="glass-panel">
-                    <h3><i class="fas fa-palette"></i> <span data-i18n="st_appearance">Appearance</span></h3>
-                    <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 1.5rem;" data-i18n="st_appearance_desc">Customize how the portal looks on your device.</p>
-                    
-                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                        <button id="theme-dark-btn" class="btn-primary" style="flex: 1; justify-content: center; background: linear-gradient(150deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.75)); border: 1px solid var(--glass-border);">
-                            <i class="fas fa-moon"></i> Dark Mode
-                        </button>
-                        <button id="theme-light-btn" class="btn-primary" style="flex: 1; justify-content: center; background: linear-gradient(150deg, rgba(255, 255, 255, 0.92), rgba(226, 232, 255, 0.78)); color: #1e293b; border: 1px solid rgba(255, 255, 255, 0.9);">
-                            <i class="fas fa-sun"></i> Light Mode
-                        </button>
+                    <button type="button" class="collapse-toggle open" data-collapse="appearance">
+                        <span class="collapse-title">
+                            <i class="fas fa-palette"></i> <span data-i18n="st_appearance">Appearance</span>
+                        </span>
+                        <i class="fas fa-chevron-down collapse-arrow"></i>
+                    </button>
+                    <p style="color: var(--text-dim); font-size: 0.9rem; margin: 0 0 1.5rem;" data-i18n="st_appearance_desc">Customize how the portal looks on your device. Your choice is saved automatically.</p>
+                    <div class="collapse-body" data-collapse-body="appearance">
+                        <div class="theme-grid">
+                            <button type="button" class="theme-card theme-dark-card" data-theme="dark">
+                                <span class="theme-swatch swatch-dark"></span>
+                                <span class="theme-meta">
+                                    <strong class="theme-name"><i class="fas fa-moon"></i> Indigo</strong>
+                                    <small class="theme-sub">Dark</small>
+                                </span>
+                                <span class="theme-check"><i class="fas fa-check"></i></span>
+                            </button>
+                            <button type="button" class="theme-card theme-light-card" data-theme="light">
+                                <span class="theme-swatch swatch-light"></span>
+                                <span class="theme-meta">
+                                    <strong class="theme-name"><i class="fas fa-sun"></i> Indigo</strong>
+                                    <small class="theme-sub">Light</small>
+                                </span>
+                                <span class="theme-check"><i class="fas fa-check"></i></span>
+                            </button>
+                            <button type="button" class="theme-card theme-dark-card" data-theme="black">
+                                <span class="theme-swatch swatch-gold-dark"></span>
+                                <span class="theme-meta">
+                                    <strong class="theme-name"><i class="fas fa-moon"></i> Gold</strong>
+                                    <small class="theme-sub">Dark</small>
+                                </span>
+                                <span class="theme-check"><i class="fas fa-check"></i></span>
+                            </button>
+                            <button type="button" class="theme-card theme-light-card" data-theme="yellow">
+                                <span class="theme-swatch swatch-gold-light"></span>
+                                <span class="theme-meta">
+                                    <strong class="theme-name"><i class="fas fa-sun"></i> Gold</strong>
+                                    <small class="theme-sub">Light</small>
+                                </span>
+                                <span class="theme-check"><i class="fas fa-check"></i></span>
+                            </button>
+                            <button type="button" class="theme-card theme-dark-card" data-theme="red">
+                                <span class="theme-swatch swatch-red-dark"></span>
+                                <span class="theme-meta">
+                                    <strong class="theme-name"><i class="fas fa-moon"></i> Red</strong>
+                                    <small class="theme-sub">Dark</small>
+                                </span>
+                                <span class="theme-check"><i class="fas fa-check"></i></span>
+                            </button>
+                            <button type="button" class="theme-card theme-light-card" data-theme="red-light">
+                                <span class="theme-swatch swatch-red-light"></span>
+                                <span class="theme-meta">
+                                    <strong class="theme-name"><i class="fas fa-sun"></i> Red</strong>
+                                    <small class="theme-sub">Light</small>
+                                </span>
+                                <span class="theme-check"><i class="fas fa-check"></i></span>
+                            </button>
+                            <button type="button" class="theme-card theme-dark-card" data-theme="green">
+                                <span class="theme-swatch swatch-green-dark"></span>
+                                <span class="theme-meta">
+                                    <strong class="theme-name"><i class="fas fa-moon"></i> Green</strong>
+                                    <small class="theme-sub">Dark</small>
+                                </span>
+                                <span class="theme-check"><i class="fas fa-check"></i></span>
+                            </button>
+                            <button type="button" class="theme-card theme-light-card" data-theme="green-light">
+                                <span class="theme-swatch swatch-green-light"></span>
+                                <span class="theme-meta">
+                                    <strong class="theme-name"><i class="fas fa-sun"></i> Green</strong>
+                                    <small class="theme-sub">Light</small>
+                                </span>
+                                <span class="theme-check"><i class="fas fa-check"></i></span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 

@@ -83,6 +83,9 @@ const adminCommentsList = document.getElementById('admin-comments-list');
 const feedbackListContainer = document.getElementById('feedback-list');
 const testFeedbackBtn = document.getElementById('test-feedback-btn');
 
+// Reports Elements
+const reportsListContainer = document.getElementById('reports-list');
+
 // World Time API Status
 const timeStatusCard = document.getElementById('time-status-card');
 const timeStatusText = document.getElementById('time-status-text');
@@ -144,6 +147,33 @@ let currentSettings = {
     rules: []
 };
 
+// Unread badge tracking for Comments / Feedback / Reports
+const SEEN_KEY = 'admin_seen_ts';
+const seenTs = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}');
+const latestTimestamps = { comments: 0, feedback: 0, reports: 0 };
+
+function markLoaded(cat, items) {
+    const maxTs = items.length ? Math.max(...items.map(i => Number(i.timestamp) || 0)) : 0;
+    latestTimestamps[cat] = maxTs;
+    updateNavDots();
+}
+
+function updateNavDots() {
+    ['comments', 'feedback', 'reports'].forEach(cat => {
+        const dot = document.querySelector(`.nav-dot[data-dot="${cat}"]`);
+        if (dot) {
+            const unseen = latestTimestamps[cat] > (Number(seenTs[cat]) || 0);
+            dot.classList.toggle('show', unseen);
+        }
+    });
+}
+
+function markSeen(cat) {
+    seenTs[cat] = latestTimestamps[cat] || Date.now();
+    localStorage.setItem(SEEN_KEY, JSON.stringify(seenTs));
+    updateNavDots();
+}
+
 // Tab Navigation
 navBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -158,6 +188,8 @@ navBtns.forEach(btn => {
                 tab.classList.add('active');
             }
         });
+
+        if (['comments', 'feedback', 'reports'].includes(target)) markSeen(target);
     });
 });
 
@@ -526,6 +558,7 @@ onValue(ref(db, 'comments'), (snapshot) => {
         Object.keys(data).map(key => comments.push({ id: key, ...data[key] }));
     }
     renderAdminComments(comments);
+    markLoaded('comments', comments);
 });
 
 function renderAdminComments(comments) {
@@ -586,7 +619,68 @@ onValue(ref(db, 'feedback'), (snapshot) => {
         })).sort((a, b) => b.timestamp - a.timestamp);
     }
     renderFeedback();
+    markLoaded('feedback', allFeedback);
 });
+
+// Sync with Firebase (Reports)
+onValue(ref(db, 'reports'), (snapshot) => {
+    const data = snapshot.val();
+    const reports = [];
+    if (data) {
+        Object.keys(data).forEach(key => reports.push({ id: key, ...data[key] }));
+    }
+    reports.sort((a, b) => b.timestamp - a.timestamp);
+    renderReports(reports);
+    markLoaded('reports', reports);
+});
+
+window.deleteReport = (id) => {
+    if (confirm("Delete this report?")) {
+        remove(ref(db, `reports/${id}`));
+    }
+};
+
+function renderReports(reports) {
+    reportsListContainer.innerHTML = '';
+    if (reports.length === 0) {
+        reportsListContainer.innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: var(--text-dim);">
+                <i class="fas fa-flag" style="font-size: 2rem; margin-bottom: 1rem; display: block;"></i>
+                No reports yet.
+            </div>
+        `;
+        return;
+    }
+
+    reports.forEach((r, index) => {
+        const dateStr = new Date(r.timestamp).toLocaleString();
+        const div = document.createElement('div');
+        div.className = 'feedback-item';
+        div.style.animationDelay = `${index * 0.1}s`;
+        div.innerHTML = `
+            <div class="feedback-header">
+                <span class="feedback-user"><i class="fas fa-user-circle"></i> ${escapeHtml(r.reporterName)} <i class="fas fa-arrow-right" style="margin:0 6px; font-size:0.7rem;"></i> <span class="report-badge"><i class="fas fa-tag"></i> ${escapeHtml(r.reportedMemberName)}</span></span>
+                <span class="feedback-date">${dateStr}</span>
+            </div>
+            <div class="feedback-content">${escapeHtml(r.message)}</div>
+            ${r.imageBase64 ? `<img class="feedback-image" src="${r.imageBase64}" onclick="viewImage('${r.imageBase64}')" alt="Attachment">` : ''}
+            <div class="feedback-actions">
+                <button class="btn-icon" onclick="deleteReport('${r.id}')" title="Delete Report">
+                    <i class="fas fa-trash-can"></i>
+                </button>
+            </div>
+        `;
+        reportsListContainer.appendChild(div);
+    });
+}
+
+window.viewImage = (src) => {
+    const lightbox = document.createElement('div');
+    lightbox.className = 'image-lightbox';
+    lightbox.innerHTML = `<img src="${src}" alt="Attachment">`;
+    lightbox.addEventListener('click', () => lightbox.remove());
+    document.body.appendChild(lightbox);
+};
 
 // Sync with Firebase (Settings)
 onValue(ref(db, 'settings'), (snapshot) => {
@@ -689,6 +783,7 @@ function renderFeedback() {
                 <span class="feedback-date">${dateStr}</span>
             </div>
             <div class="feedback-content">${f.message}</div>
+            ${f.imageBase64 ? `<img class="feedback-image" src="${f.imageBase64}" onclick="viewImage('${f.imageBase64}')" alt="Attachment">` : ''}
             <div class="feedback-actions">
                 <button class="btn-icon" onclick="deleteFeedback('${f.id}')" title="Delete Feedback">
                     <i class="fas fa-trash-can"></i>
